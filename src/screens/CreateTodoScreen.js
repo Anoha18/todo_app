@@ -50,6 +50,7 @@ const CreateTodoScreen = (props) => {
       description,
       createdDate: (existsTodo && existsTodo.createdDate) || new Date(),
       deadlineDate,
+      completed: false,
     };
 
     do {

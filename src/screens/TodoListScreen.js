@@ -6,12 +6,14 @@ import {
   TouchableOpacity,
   Dimensions,
   Animated,
-  Alert
+  Alert,
+  FlatList
 } from 'react-native';
 import { SwipeListView } from 'react-native-swipe-list-view';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment';
 import { useIsFocused } from '@react-navigation/native';
+import AntdIcon from 'react-native-vector-icons/AntDesign';
 
 const TodoListScreen = (props) => {
   const { navigation } = props;
@@ -44,6 +46,16 @@ const TodoListScreen = (props) => {
     await AsyncStorage.removeItem(id.toString());
   };
 
+  const checkedTodo = async (id) => {
+    const todo = todoList.find(t => t.id === id);
+    const newTodo = { ...todo, completed: true };
+    const newData = [...todoList];
+    newData.splice(todoList.findIndex(t => t.id === id), 1);
+    setTodoList([...newData, newTodo]);
+    await AsyncStorage.removeItem(id.toString());
+    await AsyncStorage.setItem(todo.id.toString(), JSON.stringify(newTodo));
+  };
+
   const calcDate = (deadlineDate) => {
     const momentDeadlineDate = moment(deadlineDate, 'DD.MM.YYYY');
     const momentNowDate = moment(new Date(), 'DD.MM.YYYY');
@@ -67,9 +79,9 @@ const TodoListScreen = (props) => {
     return false;
   }
 
-  const renderListItem = ({ item, index, isActive }) => (
+  const renderListItem = ({ item, index, isActive }) => (!item.completed && (
     <View
-      style={[itemStyles.container, index === todoList.length - 1 ? { marginBottom: 10 } : null]}
+      style={[itemStyles.container]}
     >
       <TouchableOpacity
         activeOpacity={1}
@@ -77,29 +89,89 @@ const TodoListScreen = (props) => {
           todoId: item.id,
           title: item.title,
         })}
+        style={{
+          flexDirection: 'row',
+        }}
       >
+        <View
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 10,
+          }}
+        >
+          <TouchableOpacity
+            style={{
+              width: 35,
+              height: 35,
+              borderRadius: 35/2,
+              borderColor: 'black',
+              borderWidth: 1,
+            }}
+            onPress={() => checkedTodo(item.id)}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <View style={itemStyles.titleContainer}>
+            <Text
+              numberOfLines={1}
+              style={[itemStyles.title, item.deadlineDate && isOverdue(item.deadlineDate) && { color: 'red' }]}
+            >{item.title}</Text>
+            <Text style={[itemStyles.date, item.deadlineDate && isOverdue(item.deadlineDate) && { color: 'red' }]}>{moment(item.createdDate).format('DD.MM.YYYY')}</Text>
+          </View>
+          <Text numberOfLines={1} style={[itemStyles.description, item.deadlineDate && isOverdue(item.deadlineDate) && { color: 'red' }]}>
+            {item.description || '-'}
+          </Text>
+          <Text
+            numberOfLines={1}
+            style={[itemStyles.deadlineDate, item.deadlineDate && isOverdue(item.deadlineDate) && { color: 'red' }]}
+          >
+            {(item.deadlineDate && calcDate(item.deadlineDate)) || ''}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  )) || (
+    <View
+      style={[
+        itemStyles.container,
+        { flexDirection: 'row' },
+      ]}
+    >
+      <View
+        style={{
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 10
+        }}
+      >
+        <AntdIcon name="checkcircle" size={30} color="green" />
+      </View>
+      <View style={{ flex: 1 }}>
         <View style={itemStyles.titleContainer}>
           <Text
             numberOfLines={1}
-            style={[itemStyles.title, item.deadlineDate && isOverdue(item.deadlineDate) && { color: 'red' }]}
+            style={[itemStyles.title]}
           >{item.title}</Text>
-          <Text style={[itemStyles.date, item.deadlineDate && isOverdue(item.deadlineDate) && { color: 'red' }]}>{moment(item.createdDate).format('DD.MM.YYYY')}</Text>
+          <Text style={[itemStyles.date]}>{moment(item.createdDate).format('DD.MM.YYYY')}</Text>
         </View>
-        <Text numberOfLines={1} style={[itemStyles.description, item.deadlineDate && isOverdue(item.deadlineDate) && { color: 'red' }]}>
+        <Text numberOfLines={1} style={[itemStyles.description]}>
           {item.description || '-'}
         </Text>
         <Text
           numberOfLines={1}
-          style={[itemStyles.deadlineDate, item.deadlineDate && isOverdue(item.deadlineDate) && { color: 'red' }]}
+          style={[itemStyles.deadlineDate]}
         >
           {(item.deadlineDate && calcDate(item.deadlineDate)) || ''}
         </Text>
-      </TouchableOpacity>
+      </View>
     </View>
   );
 
   const renderHiddenItem = ({ item, index }) => (
-    <View style={[itemStyles.rowBack, index === todoList.length - 1 ? { marginBottom: 10 } : null]}>
+    <View style={[
+      itemStyles.rowBack,
+    ]}>
       <TouchableOpacity
         style={itemStyles.backRightBtn}
         onPress={() => Alert.alert('Удалить?', '', [
@@ -133,10 +205,10 @@ const TodoListScreen = (props) => {
         ) : (
           <SwipeListView
             style={styles.list}
-            data={todoList}
+            data={[...todoList.filter(t => !t.completed), ...todoList.filter(t => t.completed)]}
             keyExtractor={(item) => item.id}
             renderItem={renderListItem}
-            renderHiddenItem={renderHiddenItem}
+            renderHiddenItem={({ item, index }) => renderHiddenItem({ item, index, completed: false })}
             showsVerticalScrollIndicator={false}
             rightOpenValue={-75}
             rightActionValue={500}
@@ -152,16 +224,19 @@ const TodoListScreen = (props) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    flexGrow: 1,
   },
   emptyText: {
     color: 'gray',
     fontSize: 20,
+    marginVertical: 20
   },
   list: {
     width: '100%',
+    flexGrow: 1,
+    // flex: 1,
   },
 });
 
@@ -208,13 +283,13 @@ const itemStyles = StyleSheet.create({
   },
   rowBack: {
     alignItems: 'center',
-    flex: 1,
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginTop: 10,
     marginLeft: 10,
     marginRight: 10,
     borderRadius: 10,
+    marginBottom: 10,
     overflow: 'hidden',
     height: 100,
   },
